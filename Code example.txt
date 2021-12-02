@@ -1,0 +1,258 @@
+##Example in creating species-specific biomass equations for Type A shrubs, using total shrub biomass as dependent variable, and D2H as predictor variable##
+library(hydroGOF)
+library(plotrix)
+data<-read.csv("shrub_data.csv",header=TRUE)
+valcod<-sample(data$cod,size=round(0.1*length(data$cod)))
+species<-data$species
+dominant.sp<-unique(species)
+wuzhong<-as.data.frame(table(species))
+dominant.sp<-wuzhong[wuzhong[,2]>=16,1]
+fitcod<-setdiff(data$cod,valcod)
+datyou<-data[data$species%in%dominant.sp,]
+dat<-datyou[datyou$cod%in%fitcod,]
+myvars<-c("cod","species","d2h","totalbiomass")
+newdat<-dat[myvars]
+domin_n<-c()
+trainfit_n<-c()
+trainfit_xmean<-c()
+trainfit_xmin<-c()
+trainfit_xmax<-c()
+trainfit_ymean<-c()
+trainfit_ymin<-c()
+trainfit_ymax<-c()
+trainfit_a<-c()
+trainfit_alev1<-c()
+trainfit_alev2<-c()
+trainfit_b<-c()
+trainfit_blev1<-c()
+trainfit_blev2<-c()
+trainfit_r<-c()
+trainfit_rlev1<-c()
+trainfit_rlev2<-c()
+trainfit_rs<-c()
+trainfit_rslev1<-c()
+trainfit_rslev2<-c()
+trainfit_rsa<-c()
+trainfit_rsalev1<-c()
+trainfit_rsalev2<-c()
+trainfit_p<-c()
+trainfit_plev1<-c()
+trainfit_plev2<-c()
+trainfit_rmse<-c()
+trainfit_rmselev1<-c()
+trainfit_rmselev2<-c()
+trainfit_cv<-c()
+trainfit_cvlev1<-c()
+trainfit_cvlev2<-c()
+trainfit_cf<-c()
+trainfit_cflev1<-c()
+trainfit_cflev2<-c()
+trainfit_mape<-c()
+trainfit_mapelev1<-c()
+trainfit_mapelev2<-c()
+
+validfit_n<-c()
+validfit_b<-c()
+validfit_blev1<-c()
+validfit_blev2<-c()
+validfit_r<-c()
+validfit_rlev1<-c()
+validfit_rlev2<-c()
+validfit_p<-c()
+validfit_plev1<-c()
+validfit_plev2<-c()
+validfit_rmse<-c()
+validfit_rmselev1<-c()
+validfit_rmselev2<-c()
+validfit_cv<-c()
+validfit_cvlev1<-c()
+validfit_cvlev2<-c()
+validfit_mape<-c()
+validfit_mapelev1<-c()
+validfit_mapelev2<-c()
+validfit_mpe<-c()
+validfit_mpelev1<-c()
+validfit_mpelev2<-c()
+validfit_error<-c()
+validfit_errorlev1<-c()
+validfit_errorlev2<-c()
+
+for(i in 1:length(dominant.sp)){
+  domindat.i<-newdat[newdat$species==dominant.sp[i],]
+  domin_n[i]<-length(domindat.i$d2h)
+  trainfit_n[i]<-round(0.75*length(domindat.i$d2h))
+  validfit_n[i]<-domin_n[i]-trainfit_n[i]
+  trainfit_xmean[i]<-mean(domindat.i$d2h)
+  trainfit_xmin[i]<-min(domindat.i$d2h)
+  trainfit_xmax[i]<-max(domindat.i$d2h)
+  trainfit_ymean[i]<-mean(domindat.i$totalbiomass)
+  trainfit_ymin[i]<-min(domindat.i$totalbiomass)
+  trainfit_ymax[i]<-max(domindat.i$totalbiomass)
+  
+  trainfit.a<-c();trainfit.b<-c();trainfit.r<-c();trainfit.rs<-c();
+  trainfit.rsa<-c();trainfit.p<-c();trainfit.see<-c();trainfit.cf<-c()
+  trainfit.rmse<-c();trainfit.cv<-c();trainfit.mape<-c();validfit.b<-c()
+  validfit.r<-c();validfit.p<-c();validfit.rmse<-c();validfit.cv<-c()
+  validfit.mape<-c();validfit.mpe<-c();validfit.error<-c()
+  
+  for(j in 1:1000){
+    domintrain.i.j<-sample(domindat.i$cod,size=round(0.75*length(domindat.i$cod)))
+    dominvalid.i.j<-setdiff(domindat.i$cod,domintrain.i.j)
+    domintraindat.i.j<-domindat.i[domindat.i$cod %in% domintrain.i.j,]
+    dominvaliddat.i.j<-domindat.i[domindat.i$cod %in% dominvalid.i.j,]
+    trainfit.i.j<-lm(log(totalbiomass)~log(d2h),data=domintraindat.i.j)
+    trainfit.res.i<-summary(trainfit.i.j)
+    trainfit.a[j]<-exp(trainfit.res.i$coefficient[1])
+    trainfit.b[j]<-trainfit.res.i$coefficient[2]
+    trainfit.r[j]<-trainfit.res.i$adj.r.squared
+    trainfit.rs[j]<-1-sum((domintraindat.i.j$totalbiomass-exp(predict(trainfit.i.j)))^2)/sum((domintraindat.i.j$totalbiomass-mean(domintraindat.i.j$totalbiomass))^2)
+    trainfit.rsa[j]<-trainfit.rs[j]-(1-trainfit.rs[j])*1/(length(domintraindat.i.j$totalbiomass)-2)
+    trainfit.p[j]<-trainfit.res.i$coefficients[,"Pr(>|t|)"][2]
+    trainfit.see[j]<-trainfit.res.i$sigma
+    trainfit.cf[j]<-exp(trainfit.see[j]^2/2)
+    trainfit.rmse[j]<-rmse(domintraindat.i.j$totalbiomass,trainfit.a[j]*domintraindat.i.j$d2h^trainfit.b[j])
+    trainfit.cv[j]<-trainfit.rmse[j]/mean(domintraindat.i.j$totalbiomass)
+    trainfit.mape[j]<-mean(abs(domintraindat.i.j$totalbiomass-trainfit.a[j]*domintraindat.i.j$d2h^trainfit.b[j])/domintraindat.i.j$totalbiomass)
+    
+    validfit.i.j<-lm(trainfit.cf[j]*trainfit.a[j]*dominvaliddat.i.j$d2h^trainfit.b[j]~-1+dominvaliddat.i.j$totalbiomass)
+    validfit.res.i<-summary(validfit.i.j)
+    validfit.b[j]<-validfit.res.i$coefficient[1]
+    validfit.r[j]<-validfit.res.i$adj.r.squared
+    validfit.p[j]<-validfit.res.i$coefficients[4]
+    validfit.rmse[j]<-rmse(dominvaliddat.i.j$totalbiomass,trainfit.cf[j]*trainfit.a[j]*dominvaliddat.i.j$d2h^trainfit.b[j])
+    validfit.cv[j]<-validfit.rmse[j]/mean(dominvaliddat.i.j$totalbiomass)
+    validfit.mape[j]<-mean(abs(dominvaliddat.i.j$totalbiomass-trainfit.cf[j]*trainfit.a[j]*dominvaliddat.i.j$d2h^trainfit.b[j])/dominvaliddat.i.j$totalbiomass)
+    validfit.mpe[j]<-mean((-dominvaliddat.i.j$totalbiomass+trainfit.cf[j]*trainfit.a[j]*dominvaliddat.i.j$d2h^trainfit.b[j])/dominvaliddat.i.j$totalbiomass)
+    validfit.error[j]<-mean(sum(-dominvaliddat.i.j$totalbiomass+trainfit.cf[j]*trainfit.a[j]*dominvaliddat.i.j$d2h^trainfit.b[j])/sum(dominvaliddat.i.j$totalbiomass))
+  }
+  n<-1000
+  trainfit_a[i]<-mean(trainfit.a)
+  s_a<-sd(trainfit.a)
+  sem_a<-s_a/sqrt(n)
+  trainfit_alev1[i]<- trainfit_a[i]+sem_a*qnorm(0.025)
+  trainfit_alev2[i]<- trainfit_a[i]+sem_a*qnorm(0.975)
+  
+  trainfit_b[i]<-mean(trainfit.b)
+  s_b<-sd(trainfit.b)
+  sem_b<-s_b/sqrt(n)
+  trainfit_blev1[i]<- trainfit_b[i]+sem_b*qnorm(0.025)
+  trainfit_blev2[i]<- trainfit_b[i]+sem_b*qnorm(0.975)
+  
+  trainfit_r[i]<-mean(trainfit.r)
+  s_r<-sd(trainfit.r)
+  sem_r<-s_r/sqrt(n)
+  trainfit_rlev1[i]<- trainfit_r[i]+sem_r*qnorm(0.025)
+  trainfit_rlev2[i]<- trainfit_r[i]+sem_r*qnorm(0.975)
+  
+  trainfit_rs[i]<-mean(trainfit.rs)
+  s_rs<-sd(trainfit.rs)
+  sem_rs<-s_rs/sqrt(n)
+  trainfit_rslev1[i]<- trainfit_rs[i]+sem_rs*qnorm(0.025)
+  trainfit_rslev2[i]<- trainfit_rs[i]+sem_rs*qnorm(0.975)
+  
+  trainfit_rsa[i]<-mean(trainfit.rsa)
+  s_rsa<-sd(trainfit.rsa)
+  sem_rsa<-s_rsa/sqrt(n)
+  trainfit_rsalev1[i]<- trainfit_rsa[i]+sem_rsa*qnorm(0.025)
+  trainfit_rsalev2[i]<- trainfit_rsa[i]+sem_rsa*qnorm(0.975)
+  
+  trainfit_p[i]<-mean(trainfit.p)
+  s_p<-sd(trainfit.p)
+  sem_p<-s_p/sqrt(n)
+  trainfit_plev1[i]<- trainfit_p[i]+sem_p*qnorm(0.025)
+  trainfit_plev2[i]<- trainfit_p[i]+sem_p*qnorm(0.975)
+  
+  trainfit_rmse[i]<-mean(trainfit.rmse)
+  s_rmse<-sd(trainfit.rmse)
+  sem_rmse<-s_rmse/sqrt(n)
+  trainfit_rmselev1[i]<- trainfit_rmse[i]+sem_rmse*qnorm(0.025)
+  trainfit_rmselev2[i]<- trainfit_rmse[i]+sem_rmse*qnorm(0.975)
+  
+  trainfit_cv[i]<-mean(trainfit.cv)
+  s_cv<-sd(trainfit.cv)
+  sem_cv<-s_cv/sqrt(n)
+  trainfit_cvlev1[i]<- trainfit_cv[i]+sem_cv*qnorm(0.025)
+  trainfit_cvlev2[i]<- trainfit_cv[i]+sem_cv*qnorm(0.975)
+  
+  
+  trainfit_cf[i]<-mean(trainfit.cf)
+  s_cf<-sd(trainfit.cf)
+  sem_cf<-s_cf/sqrt(n)
+  trainfit_cflev1[i]<- trainfit_cf[i]+sem_cf*qnorm(0.025)
+  trainfit_cflev2[i]<- trainfit_cf[i]+sem_cf*qnorm(0.975)
+  
+  trainfit_mape[i]<-mean(trainfit.mape)
+  s_mape<-sd(trainfit.mape)
+  sem_mape<-s_mape/sqrt(n)
+  trainfit_mapelev1[i]<- trainfit_mape[i]+sem_mape*qnorm(0.025)
+  trainfit_mapelev2[i]<- trainfit_mape[i]+sem_mape*qnorm(0.975)
+  
+  validfit_b[i]<-mean(validfit.b)
+  sv_b<-sd(validfit.b)
+  semv_b<-sv_b/sqrt(n)
+  validfit_blev1[i]<- validfit_b[i]+semv_b*qnorm(0.025)
+  validfit_blev2[i]<- validfit_b[i]+semv_b*qnorm(0.975)
+  
+  validfit_r[i]<-mean(validfit.r)
+  sv_r<-sd(validfit.r)
+  semv_r<-sv_r/sqrt(n)
+  validfit_rlev1[i]<- validfit_r[i]+semv_r*qnorm(0.025)
+  validfit_rlev2[i]<- validfit_r[i]+semv_r*qnorm(0.975)
+  
+  validfit_p[i]<-mean(validfit.p)
+  sv_p<-sd(validfit.p)
+  semv_p<-sv_p/sqrt(n)
+  validfit_plev1[i]<- validfit_p[i]+semv_p*qnorm(0.025)
+  validfit_plev2[i]<- validfit_p[i]+semv_p*qnorm(0.975)
+  
+  validfit_rmse[i]<-mean(validfit.rmse)
+  sv_rmse<-sd(validfit.rmse)
+  semv_rmse<-sv_rmse/sqrt(n)
+  validfit_rmselev1[i]<- validfit_rmse[i]+semv_rmse*qnorm(0.025)
+  validfit_rmselev2[i]<- validfit_rmse[i]+semv_rmse*qnorm(0.975)
+  
+  validfit_cv[i]<-mean(validfit.cv)
+  sv_cv<-sd(validfit.cv)
+  semv_cv<-sv_cv/sqrt(n)
+  validfit_cvlev1[i]<- validfit_cv[i]+semv_cv*qnorm(0.025)
+  validfit_cvlev2[i]<- validfit_cv[i]+semv_cv*qnorm(0.975)
+  
+  validfit_mape[i]<-mean(validfit.mape)
+  sv_mape<-sd(validfit.mape)
+  semv_mape<-sv_mape/sqrt(n)
+  validfit_mapelev1[i]<- validfit_mape[i]+semv_mape*qnorm(0.025)
+  validfit_mapelev2[i]<- validfit_mape[i]+semv_mape*qnorm(0.975)
+  
+  validfit_mpe[i]<-mean(validfit.mpe)
+  sv_mpe<-sd(validfit.mpe)
+  semv_mpe<-sv_mpe/sqrt(n)
+  validfit_mpelev1[i]<- validfit_mpe[i]+semv_mpe*qnorm(0.025)
+  validfit_mpelev2[i]<- validfit_mpe[i]+semv_mpe*qnorm(0.975)
+  
+  validfit_error[i]<-mean(validfit.error)
+  sv_error<-sd(validfit.error)
+  semv_error<-sv_error/sqrt(n)
+  validfit_errorlev1[i]<- validfit_error[i]+semv_error*qnorm(0.025)
+  validfit_errorlev2[i]<- validfit_error[i]+semv_error*qnorm(0.975)
+  
+  print(i)
+}
+just<-1:length(dominant.sp)
+res<-cbind(as.character(dominant.sp[just]),domin_n,trainfit_n,trainfit_xmean,trainfit_xmin,trainfit_xmax,
+           trainfit_ymean,trainfit_ymin,trainfit_ymax,trainfit_a,
+           trainfit_alev1,trainfit_alev2,trainfit_b,trainfit_blev1,
+           trainfit_blev2,trainfit_r,trainfit_rlev1,trainfit_rlev2,
+           trainfit_rs,trainfit_rslev1,trainfit_rslev2,trainfit_rsa,trainfit_rsalev1,
+           trainfit_rsalev2,trainfit_p,
+           trainfit_plev1,trainfit_plev2,trainfit_rmse,trainfit_rmselev1,
+           trainfit_rmselev2,trainfit_cv,trainfit_cvlev1,trainfit_cvlev2,
+           trainfit_cf,trainfit_cflev1,trainfit_cflev2,
+           trainfit_mape,trainfit_mapelev1,trainfit_mapelev2,
+           validfit_n,validfit_b,validfit_blev1,
+           validfit_blev2,validfit_r,validfit_rlev1,validfit_rlev2,
+           validfit_p,validfit_plev1,validfit_plev2,validfit_rmse,
+           validfit_rmselev1,validfit_rmselev2,validfit_cv,
+           validfit_cvlev1,validfit_cvlev2,validfit_mape,
+           validfit_mapelev1,validfit_mapelev2,validfit_mpe,validfit_mpelev1,validfit_mpelev2,validfit_error,
+           validfit_errorlev1,validfit_errorlev2)
+write.csv(res,"species-specific biomass equations for Type A shrubs:totalbiomass-d2h.csv")
